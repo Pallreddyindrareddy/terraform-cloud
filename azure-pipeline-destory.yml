@@ -1,0 +1,44 @@
+stages:
+  - stage: tfdestroy
+    jobs:
+      
+      - job: destroyapproval
+        
+        condition: and (succeeded(),ne(variables['Build.Reason'],'PullRequest'))
+        pool: server
+        displayName: wait for approval before destroy
+        steps:
+          
+          - task: ManualValidation@0
+            timeoutInMinutes: 15
+            inputs:
+              instructions: 'please approve the job'
+              emailRecipients: 'pallreddyindrareddy@gmail.com'
+              onTimeout: 'reject'
+          
+      - job: apply
+        dependsOn: destroyapproval
+        condition: and (succeeded(),ne(variables['Build.Reason'],'PullRequest'))
+        pool: default
+        displayName: destroying all the resources
+        steps:
+          
+          - task: TerraformInstaller@1
+            inputs:
+              terraformVersion: 'latest'
+          - task: TerraformTaskV4@4
+            displayName: reintilzied required for tfstate
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              backendServiceArm: 'terraform service connection'
+              backendAzureRmResourceGroupName: 'terraform-stage'
+              backendAzureRmStorageAccountName: 'stage4321'
+              backendAzureRmContainerName: 'tfstate'
+              backendAzureRmKey: 'terraproject.state'
+          - task: TerraformTaskV4@4
+            displayName: destroy the resource
+            inputs:
+              provider: 'azurerm'
+              command: 'destroy'
+              environmentServiceNameAzureRM: 'terraform service connection'
